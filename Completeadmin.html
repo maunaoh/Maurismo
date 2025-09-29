@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuestionario Interactivo Mejorado</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bloque de CSS Personalizado (Estilos) -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f5f7;
+            color: #374151;
+        }
+        .quiz-container {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .answer-btn, .term-btn {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            word-break: break-word;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem; /* 12px */
+        }
+        
+        /* === Paleta de Colores Principal === */
+        .correct { background-color: #059669 !important; color: white !important; border-color: #047857 !important; }
+        .incorrect { background-color: #e11d48 !important; color: white !important; border-color: #be123c !important; }
+        .selected-term { background-color: #6F1D45 !important; color: white !important; border: 2px solid #581736; transform: scale(1.02); font-weight: 600; }
+        .selected-answer { background-color: #f3e8ee !important; border: 2px solid #6F1D45 !important; }
+        .paired-item { background-color: #f3e8ee; color: #6F1D45; border: 1px dashed #c08497; }
+        .paired-correct { background-color: #a7f3d0 !important; color: #064e3b !important; }
+        .paired-incorrect { background-color: #fecdd3 !important; color: #881337 !important; }
+        .disabled-final { cursor: not-allowed; opacity: 0.8; }
+
+        /* === Estilos del Cronómetro y Puntos === */
+        #timer-container { width: 180px; display: flex; flex-direction: column; align-items: center; }
+        #clock-face { width: 150px; height: 150px; border: 8px solid #e5e7eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background-color: white; transition: border-color 0.3s; }
+        #clock-face.time-warning { border-color: #f59e0b; }
+        #clock-hand { width: 4px; height: 60px; background-color: #6F1D45; position: absolute; bottom: 50%; left: calc(50% - 2px); transform-origin: bottom center; border-radius: 2px; transition: transform 1s linear; }
+        #timer-text { font-size: 2.5rem; font-weight: 800; color: #6F1D45; z-index: 10; }
+        #points-container { margin-top: 1rem; padding: 0.5rem 1rem; border: 2px solid #f3e8ee; border-radius: 8px; text-align: center; background-color: white; width: 150px; }
+        #points-value { font-size: 1.5rem; font-weight: 700; color: #6F1D45; }
+
+        /* === Estilos para Identificadores de Matching === */
+        .letter-identifier {
+            width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; border-radius: 50%; background-color: #f3e8ee; color: #6F1D45;
+            flex-shrink: 0;
+        }
+        .indicator-placeholder { width: 2rem; height: 2rem; flex-shrink: 0; }
+        .match-indicator {
+            width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; border-radius: 50%; background-color: #6F1D45; color: white;
+            transition: all 0.2s ease-in-out; transform: scale(0);
+        }
+        .match-indicator:not(:empty) { transform: scale(1); }
+        .match-indicator.correct { background-color: #059669 !important; color: white !important; }
+        .match-indicator.incorrect { background-color: #e11d48 !important; color: white !important; }
+        
+        #image-container { margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; background-color: #ffffff; }
+        #question-image { width: 100%; height: auto; max-height: 250px; object-fit: contain; }
+
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; align-items: center; }
+            #timer-container { margin-bottom: 2rem; width: 100%; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="main-layout flex items-start justify-center gap-8 w-full max-w-5xl">
+
+        <!-- Contenedor del Cronómetro y Puntos -->
+        <div id="timer-container">
+            <h3 class="text-xl font-bold text-[#6F1D45] mb-4">Tiempo</h3>
+            <div id="clock-face">
+                <div id="clock-hand"></div>
+                <span id="timer-text">60</span>
+            </div>
+            <div id="points-container">
+                <span class="text-sm font-medium text-gray-500">Valor</span>
+                <p id="points-value">1.00</p>
+            </div>
+        </div>
+
+        <!-- Contenedor principal del Quiz -->
+        <div id="quiz-app" class="quiz-container bg-white p-8 rounded-xl w-full max-w-2xl relative">
+            <h1 class="text-3xl font-bold text-center text-[#6F1D45] mb-4 border-b-2 pb-2 border-gray-200">
+                Cuestionario de estudio de Administración de Proyectos
+            </h1>
+            <div class="flex justify-center items-center mb-6">
+                <p id="progress-display" class="text-md font-semibold text-gray-600"></p>
+            </div>
+            <div id="question-area">
+                <h2 id="question-text" class="text-xl font-semibold mb-6 text-gray-800 text-center"></h2>
+                <div id="image-container" class="hidden">
+                    <img id="question-image" src="" alt="Imagen de referencia para la pregunta" onerror="this.style.display='none'; this.parentElement.classList.add('hidden');">
+                </div>
+                <div id="answer-buttons" class="grid grid-cols-1 gap-4 relative"></div>
+            </div>
+            <div class="mt-8 text-center">
+                <p id="feedback-message" class="mt-4 text-lg font-medium h-6"></p>
+                <button id="submit-btn" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out mt-4 mr-4">Enviar Respuesta</button>
+                <button id="next-btn" class="hidden bg-[#6F1D45] hover:bg-[#581736] text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out disabled:opacity-50 mt-4">Siguiente</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloque de JavaScript -->
+    <script>
+        // =========================================================================
+        // 1. DATOS DEL QUIZ (con valor en puntos)
+        // =========================================================================
+        const quizData = [
+            { question: "¿Qué representa el ciclo de vida de un proyecto", type: "multiple_choice", points: 1, answers: [{ text: "Únicamente la etapa de planificación", correct: false }, { text: "Las etapas desde el inicio hasta el fin del proyecto", correct: true }, { text: "La ejecución de las actividades financieras", correct: false }, { text: "El control de los costos", correct: false }] },
+            { question: "¿Cuál de las siguientes NO es una etapa del ciclo de vida de un proyecto?", type: "multiple_choice", points: 1, answers: [{ text: "Inicio", correct: false }, { text: "Planificación", correct: false }, { text: "Ejecución", correct: false }, { text: "Comercialización", correct: true }] },
+            { question: "El seguimiento y control dentro del ciclo de vida de un proyecto se relaciona con la trazabilidad", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "En la fase de planificación, se busca principalmente", type: "multiple_choice", points: 1, answers: [{ text: "Definir el alcance, los objetivos, y el curso del proyecto", correct: true }, { text: "Establecer los indicadores de rentabilidad", correct: false }, { text: "Realizar los procesos de ejecución", correct: false }, { text: "Cerrar formalmente el proyecto", correct: false }] },
+            { question: "La alineación estratégica de un proyecto implica que:", type: "multiple_choice", points: 1, answers: [{ text: "Se ejecutan proyectos sin relación con la empresa", correct: false },{ text: "Cada proyecto contribuya al plan de desarrollo de la organización", correct: true}, { text: "Solo se busque rentabilidad económica", correct: false}, { text: "Los proyectos se realicen de forma aislada", correct: false}]},
+            { question: "Una ventaja del impacto empresarial de los proyectos es:", type: "multiple_choice", points: 1, answers: [{ text: "Aumentar únicamente el número de ventas", correct: false}, { text: "Generar ventajas competitivas sostenibles", correct: true}, { text: "Evitar la innovación para reducir riesgos", correct: false}, { text: "Mantenerse sin cambios en el mercado", correct: false}]},
+            { question: "La gestión de portafolio de proyectos permite medir el impacto global y evitar duplicidad de esfuerzos", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true}, {text: "Falso", correct: false}]},
+            { question: "El crecimiento empresarial solo consiste en vender más productos o servicios", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false}, { text: "Falso", correct: true}]},
+            { question: "Los proyectos insertados en el plan de desarrollo empresarial deben considerar tendencias actuales como la transformación digital y la sostenibilidad", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true}, { text: "Falso", correct: false}]},
+            { question: "El cierre de un proyecto significa la cancelación inmediata de las actividades en curso", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false}, { text: "Falso", correct: true}]},
+            { question: "Empareja las opciones", type: "matching", points: 3, matches: [{ term: "Plan de calidad", match: "Documento que establece los estándares, procedimientos, y responsabilidades necesarias para cumplir con los requisitos de calidad de un proyecto o producto." }, { term: "Indicadores de desempeño KPI", match: "Métricas utilizada para evaluar la efectividad del plan de calidad" }, { term: "Procedimientos de control", match: "Son los pasos detallados y métodos que se emplearán para mantener y verificar los estándares de calidad"}]},
+            { question: "¿Cómo deben ser los objetivos de calidad?,", type: "multiple_choice", points: 1, answers: [{ text: "Generales, amplios y flexibles", correct: false}, { text: "Específicos, claros y medibles", correct: true}, { text: "Ambiguos y abiertos a la interpretación", correct: false}, { text: "Solo cualitativos", correct: false}]},
+            { question: "Para que sirve el plan de adquisiciones en un proyecto", type: "multiple_choice", points: 1, answers: [{ text: "Para evaluar el desempeño del equipo", correct: false}, { text: "Para definir la estructura organizacional", correct: false}, { text: "Para definir que recursos externos se necesitan, a quién comprarlos y en qué momento", correct: true}, { text: "Para capacitr al personal", correct: false}]},
+            { question: "¿Que se debe considerar al seleccionar un proveedor?", type: "multiple_choice", points: 1, answers: [{ text: "Solo la reputación en redes sociales", correct: false}, { text: "Precio, calidad, y tiempos de entrega", correct: true}, { text: "Cantidad de empleados", correct: false}, { text: "Ubicación geográfica exclusivamente", correct: false}]},
+            { question: "¿Qué sucede en la etapa de ejecución de un proyecto?", type: "multiple_choice", points: 1, answers: [{ text: "Se registran únicamente los costos", correct: false}, { text: "Se establecen los objetivos del proyecto", correct: false}, { text: "Se ponen en marcha los planes, se asignan tareas y se coordinan recursos", correct: true}, { text: "Se archivan los documentos históricos de la organización", correct: false}]},
+            { question: "¿Por qué es importante el monitoreo y control en un proyecto?", type: "multiple_choice", points: 1, answers: [{ text: "Porque se permite aumentar costos", correct: false}, { text: "Porque se posterga la toma de decisiones", correct: false}, { text: "Porque se permite medir el desempeño, detectar desviaciones y aplicar acciones correctivas", correct: true}, { text: "Porque reemplaza la comunicación del equipo", correct: false}]},
+            { question: "¿Qué actividades se realizan en el cierre del proyecto", type: "multiple_choice", points: 1, answers: [{ text: "Solo se celebra el éxito del proyecto", correct: false}, { text: "Se vuelve a elaborar un plan incial para el siguiente proyecto", correct: false}, { text: "Entrega oficial de resultados, liberación de recursos y documentación de lecciones aprendidas", correct: true}, { text: "Definición del presupuesto", correct: false}]},
+            { question: "¿Cuál es el objetivo principal de las etapas de ejecución, monitoreo, control y cierre?", type: "multiple_choice", points: 1, answers: [{ text: "Generar más documentos administrativos", correct: false}, { text: "Cambiar los objetivos constantemente", correct: false}, { text: "Adaptase a las tendencias de redes sociales", correct: false}, { text: "Evitar la participación del equipo", correct: false}, {text: "Asegurar que el proyecto se lleve a cabo como se planeó y concluya satisfactoriamente", correct: true}]},
+            { question: "Esta NO es una forma de clasificar proyectos", type: "multiple_choice", points: 1, answers: [{ text: "Por alcance", correct: false}, { text: "Por complejidad", correct: false}, { text: "Por costos de desarrollo", correct: true}, { text: "Por sector", correct: false}]},
+            { question: "Sociales, económicos y tecnológicos son tipos de proyectos de la siguiente clasificación:", type: "multiple_choice", points: 1, answers: [{ text: "Por finalidad", correct: true}, { text: "Por complejidad", correct: false}, { text: "Por alcance", correct: false}, { text: "Por costo de ejecución", correct: false}]},
+            { question: "Si clasificamos los proyectos por sector, los proyectos son del sector:", type: "multiple_choice", points: 1, answers: [{ text: "Primario, secundario, de servicios", correct: false}, { text: "Salud, industrial, agropecuario, educación, ingenieríl", correct: false}, { text: "Local, nacional, internacional", correct: false}, { text: "Público, privado, Mixto", correct: true}]},
+            { question: "Enlaza los tipos de proyectos con su clasificación", type: "matching", points: 4, matches: [ { term: "Por complejidad", match: "Simples, complejos"}, { term: "Por sector", match: "Público, privado, mixto"}, { term: "Por alcance", match: "Local, nacional, internacional"}, { term: "Por finalidad", match: "Sociales, económicos, tecnológicos"}]},
+            { question: "Las características de un proyecto son: objetivos claros, tiempo ilimitado, recursos definidos, riesgo o incertidumbre, resultados", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false}, { text: "Falso", correct: true}]},
+            { question: "Las características de un proyecto son: objetivos claros, temporalidad (tiempo limitado), recursos definidos, riesgo e incertidumbre, resultados únicos", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true}, { text: "Falso", correct: false}]},
+            { question: "Inicio, planificación, ejecución, monitoreo y contro, cierre, forman parte de:", type: "multiple_choice", points: 1, answers: [{ text: "Ciclo de vida de un plan", correct: false}, { text: "Ciclo de vida de la administración", correct: false}, { text: "Ciclo de vida de un proyecto", correct: true}, { text: "Características de un proyecto", correct: false}]},
+            { question: "Selecciona los componentes de la administración de proyectos:", type: "multiple_select", points: 10, answers: [
+                { text: "Alcance", correct: true }, { text: "Recursos humanos", correct: true},
+                { text: "Tiempo", correct: true }, { text: "Comunicación", correct: true},
+                { text: "Planteamiento", correct: false }, { text: "Riesgo", correct: true},
+                { text: "Calidad", correct: true }, { text: "Adquisiciones", correct: true},
+                { text: "Idealidad", correct: false }, { text: "Mercado objetivo", correct: false},
+                { text: "Costo", correct: true}, { text: "Mejora continua", correct: false}
+            ]},
+            { question: "No hay proyectos únicos", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false}, { text: "Falso", correct: true}]},
+            { question: "Asegura un plan sólido del proyecto", type: "multiple_choice", points: 1, answers: [{ text: "Gestión de la cadena de suministro", correct: false}, { text: "Gestión de calidad", correct: false}, { text: "Gestión de proyecto", correct: true}]},
+            { question: "La administración de proyectos organiza recursos para lograr objetivos", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true}, { text: "Falso", correct: false}]},
+            { question: "Importancia de los proyectos", type: "multiple_select", points: 4, answers: [
+                { text: "Alcanzan objeivos estratégicos", correct: true}, { text: "Promueven innovación", correct: true},
+                { text: "Optimizan recursos", correct: true}, { text: "Generan impacto social y económico", correct: true}
+            ]},
+            { question: "Realiza los conectes adecuados", type: "matching", points: 3, matches: [{ term: "Actores", match: "Patrocinadores, beneficiarios, equipo"}, { term: "Entorno", match: "Económico, político, social, ambiental"}, { term: "Metodologías", match: "PMI, PRINCE2, Ágil, Scrum"}]}
+        ];
+
+        // =========================================================================
+        // 2. LÓGICA DEL QUIZ Y ESTADO
+        // =========================================================================
+        const questionText = document.getElementById('question-text'), answerButtons = document.getElementById('answer-buttons'), nextButton = document.getElementById('next-btn'), submitButton = document.getElementById('submit-btn'), feedbackMessage = document.getElementById('feedback-message'), progressDisplay = document.getElementById('progress-display'), imageContainer = document.getElementById('image-container'), questionImage = document.getElementById('question-image'), clockFace = document.getElementById('clock-face'), clockHand = document.getElementById('clock-hand'), timerText = document.getElementById('timer-text'), pointsValue = document.getElementById('points-value');
+        
+        let currentQuestionIndex = 0, score = 0, totalPossibleScore = 0, shuffledQuizData = [], timer = null, timeLeft = 60, TIME_PER_QUESTION = 60;
+        let activeTermSelection = null, activeMatchSelection = null, userPairs = new Map(), currentMatchingMatches = []; 
+
+        function shuffleArray(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}}
+
+        function startTimer() {
+            clearInterval(timer); timeLeft = TIME_PER_QUESTION; clockFace.classList.remove('time-warning');
+            clockHand.style.transition = 'none'; clockHand.style.transform = 'rotate(0deg)';
+            void clockHand.offsetWidth; clockHand.style.transition = `transform 1s linear`;
+            timerText.textContent = timeLeft;
+            timer = setInterval(() => {
+                timeLeft--; timerText.textContent = timeLeft;
+                const degrees = ((TIME_PER_QUESTION - timeLeft) / TIME_PER_QUESTION) * 360;
+                clockHand.style.transform = `rotate(${degrees}deg)`;
+                if (timeLeft <= 10 && timeLeft > 0) clockFace.classList.add('time-warning');
+                else if (timeLeft <= 0) timesUp();
+            }, 1000);
+        }
+
+        function stopTimer(){clearInterval(timer)}
+        
+        function timesUp() {
+            stopTimer(); feedbackMessage.textContent = '¡Tiempo agotado! ⌛';
+            const qType = shuffledQuizData[currentQuestionIndex].type;
+            if (qType === 'matching') submitMatchAnswer();
+            else if (qType === 'multiple_select') submitMultipleSelectAnswer();
+            else {
+                disableAllInteraction();
+                Array.from(answerButtons.children).forEach(b => { if (b.dataset.correct === 'true') b.classList.add('correct'); });
+                showNextButton(2000);
+            }
+        }
+        
+        function showNextButton(d=0){setTimeout(()=>{nextButton.classList.remove('hidden');nextButton.disabled=false;submitButton.classList.add('hidden')},d)}
+
+        function startQuiz() {
+            shuffledQuizData = [...quizData];
+            shuffleArray(shuffledQuizData);
+            currentQuestionIndex = 0;
+            score = 0;
+            totalPossibleScore = shuffledQuizData.reduce((sum, question) => sum + question.points, 0);
+            nextButton.innerHTML = "Siguiente";
+            nextButton.classList.add('hidden');
+            submitButton.classList.add('hidden');
+            feedbackMessage.textContent = '';
+            questionText.classList.remove('hidden');
+            showQuestion();
+        }
+
+        function resetState() {
+            nextButton.classList.add('hidden'); submitButton.classList.add('hidden');
+            feedbackMessage.textContent = '';
+            answerButtons.className = 'grid grid-cols-1 gap-4 relative'; 
+            imageContainer.classList.add('hidden');
+            const solutionContainer = document.getElementById('solution-container');
+            if (solutionContainer) solutionContainer.remove();
+            while (answerButtons.firstChild) answerButtons.removeChild(answerButtons.firstChild);
+            activeTermSelection = null; activeMatchSelection = null; userPairs.clear(); currentMatchingMatches = [];
+        }
+
+        function showQuestion() {
+            stopTimer(); resetState();
+            const q = shuffledQuizData[currentQuestionIndex];
+            progressDisplay.textContent = `Pregunta ${currentQuestionIndex + 1} de ${shuffledQuizData.length}`;
+            questionText.textContent = q.question;
+            pointsValue.textContent = `${q.points.toFixed(2)}`;
+            if (q.type === 'matching') {
+                showMatching(q); submitButton.textContent = 'Enviar Pares'; submitButton.classList.remove('hidden'); submitButton.disabled = false;
+            } else if (q.type === 'multiple_select') {
+                if (q.answers.length > 6) {
+                    answerButtons.className = 'grid grid-cols-2 gap-x-6 gap-y-4 relative';
+                }
+                showMultipleSelect(q); submitButton.textContent = 'Enviar Selección'; submitButton.classList.remove('hidden'); submitButton.disabled = false;
+            } else { showMultipleChoice(q); }
+            startTimer();
+        }
+
+        function disableAllInteraction(){Array.from(answerButtons.children).forEach(b=>{b.disabled=true;b.classList.add('disabled-final')});submitButton.disabled=true}
+
+        function showMultipleChoice(q) {
+            if (q.type === 'image_choice' && q.imageUrl) {
+                questionImage.src = q.imageUrl; imageContainer.classList.remove('hidden');
+            } else imageContainer.classList.add('hidden');
+            q.answers.forEach(a => {
+                const b = document.createElement('button'); b.textContent = a.text;
+                b.classList.add('answer-btn','bg-gray-200','text-gray-800','font-medium','py-3','px-4','rounded-lg','text-left','hover:bg-gray-300','focus:outline-none','focus:ring-2','focus:ring-[#6F1D45]');
+                if (a.correct) b.dataset.correct = a.correct;
+                b.addEventListener('click', selectAnswer); answerButtons.appendChild(b);
+            });
+        }
+        
+        function selectAnswer(e) {
+            stopTimer();
+            const sb = e.target;
+            const isC = sb.dataset.correct === 'true';
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const points = currentQuestion.points;
+
+            if (isC) {
+                sb.classList.add('correct');
+                feedbackMessage.textContent = `¡Correcto! ✅ (+${points.toFixed(2)} Puntos)`;
+                score += points;
+            } else {
+                sb.classList.add('incorrect');
+                feedbackMessage.textContent = 'Incorrecto. ❌';
+            }
+            disableAllInteraction();
+            Array.from(answerButtons.children).forEach(b => { if (b.dataset.correct === 'true') b.classList.add('correct'); });
+            showNextButton();
+        }
+
+        function showMultipleSelect(q) {
+            q.answers.forEach(a => {
+                const button = document.createElement('button');
+                button.innerHTML = `
+                    <div class="w-6 h-6 border-2 border-gray-400 rounded-md flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-4 h-4 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <span class="flex-grow text-left">${a.text}</span>`;
+                button.classList.add('answer-btn', 'bg-gray-200', 'text-gray-800', 'font-medium', 'py-3', 'px-4', 'rounded-lg', 'hover:bg-gray-300', 'focus:outline-none', 'focus:ring-2', 'focus:ring-[#6F1D45]');
+                button.dataset.correct = a.correct;
+                button.dataset.selected = 'false';
+                button.addEventListener('click', toggleAnswerSelection);
+                answerButtons.appendChild(button);
+            });
+        }
+
+        function toggleAnswerSelection(e) {
+            const button = e.currentTarget;
+            const isSelected = button.dataset.selected === 'true';
+            button.dataset.selected = String(!isSelected);
+            button.classList.toggle('selected-answer');
+            const checkbox = button.querySelector('div');
+            const checkmark = button.querySelector('svg');
+            checkbox.classList.toggle('bg-[#6F1D45]');
+            checkbox.classList.toggle('border-[#6F1D45]');
+            checkmark.classList.toggle('hidden');
+        }
+
+        function submitMultipleSelectAnswer() {
+            stopTimer(); disableAllInteraction(); submitButton.classList.add('hidden');
+            const buttons = Array.from(answerButtons.children);
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const totalCorrectOptions = currentQuestion.answers.filter(a => a.correct).length;
+            let correctSelections = 0, incorrectSelections = 0;
+
+            buttons.forEach(button => {
+                const isCorrect = button.dataset.correct === 'true';
+                const isSelected = button.dataset.selected === 'true';
+                if (isSelected && isCorrect) correctSelections++;
+                else if (isSelected && !isCorrect) incorrectSelections++;
+            });
+            
+            buttons.forEach(button => {
+                const isCorrect = button.dataset.correct === 'true';
+                const isSelected = button.dataset.selected === 'true';
+                if (isCorrect) button.classList.add('correct');
+                if (isSelected && !isCorrect) button.classList.add('incorrect');
+            });
+
+            const questionPoints = currentQuestion.points;
+            const pointsEarned = questionPoints * (Math.max(0, correctSelections - (incorrectSelections * 0.5)) / totalCorrectOptions);
+            score += pointsEarned;
+            feedbackMessage.textContent = `¡Respuesta evaluada! Ganaste ${pointsEarned.toFixed(2)} puntos.`;
+
+            const solutionContainer = document.createElement('div');
+            solutionContainer.id = 'solution-container';
+            solutionContainer.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-left';
+            solutionContainer.innerHTML = '<h3 class="font-bold text-lg text-green-800 mb-2">Respuestas Correctas:</h3>';
+            const solutionList = document.createElement('ul');
+            solutionList.className = 'list-disc list-inside space-y-1 text-green-700';
+            currentQuestion.answers.forEach(answer => {
+                if (answer.correct) {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = answer.text;
+                    solutionList.appendChild(listItem);
+                }
+            });
+            solutionContainer.appendChild(solutionList);
+            answerButtons.parentNode.appendChild(solutionContainer);
+
+            showNextButton();
+        }
+        
+        function createMatchingButton(text, type, letter = '') {
+            const button = document.createElement('button');
+            button.classList.add('term-btn', 'bg-gray-200', 'text-gray-800', 'font-medium', 'p-3', 'rounded-lg', 'text-left', 'h-full', 'z-10');
+            button.dataset.value = text; button.dataset.type = type;
+            if (type === 'term') {
+                button.dataset.letter = letter;
+                button.innerHTML = `<div class="letter-identifier">${letter}</div><span class="flex-grow">${text}</span>`;
+            } else {
+                button.innerHTML = `<div class="indicator-placeholder"><div class="match-indicator"></div></div><span class="flex-grow">${text}</span>`;
+            }
+            button.addEventListener('click', handleMatchingSelection);
+            return button;
+        }
+
+        function showMatching(q) {
+            answerButtons.className = 'grid grid-cols-2 gap-x-8 gap-y-4 relative'; 
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+            let terms = q.matches.map(m => m.term), matches = q.matches.map(m => m.match);
+            currentMatchingMatches = q.matches; shuffleArray(matches); 
+            for (let i = 0; i < terms.length; i++) {
+                answerButtons.appendChild(createMatchingButton(terms[i], 'term', alphabet[i]));
+                answerButtons.appendChild(createMatchingButton(matches[i], 'match'));
+            }
+        }
+        
+        function updateMatchIndicators() {
+            const matchToTerm = new Map([...userPairs].map(([term, match]) => [match, term]));
+            const termToLetter = new Map();
+            Array.from(answerButtons.children).filter(btn => btn.dataset.type === 'term').forEach(btn => termToLetter.set(btn.dataset.value, btn.dataset.letter));
+            Array.from(answerButtons.children).filter(btn => btn.dataset.type === 'match').forEach(matchBtn => {
+                const indicator = matchBtn.querySelector('.match-indicator');
+                const matchValue = matchBtn.dataset.value;
+                if (matchToTerm.has(matchValue)) {
+                    const termValue = matchToTerm.get(matchValue);
+                    indicator.textContent = termToLetter.get(termValue);
+                } else {
+                    indicator.textContent = '';
+                }
+            });
+        }
+
+        function handleMatchingSelection(e) {
+            const clickedBtn = e.currentTarget; const type = clickedBtn.dataset.type;
+            if (clickedBtn.classList.contains('paired-item')) {
+                const pVal=(type==='term')?userPairs.get(clickedBtn.dataset.value):Array.from(userPairs.entries()).find(([,m])=>m===clickedBtn.dataset.value)?.[0];
+                if(pVal){
+                    const pEl=Array.from(answerButtons.children).find(b=>b.dataset.value===pVal&&b!==clickedBtn);
+                    clickedBtn.classList.remove('paired-item'); if(pEl)pEl.classList.remove('paired-item');
+                    if(type==='term')userPairs.delete(clickedBtn.dataset.value); else Array.from(userPairs.entries()).forEach(([t,m])=>{if(m===clickedBtn.dataset.value)userPairs.delete(t)});
+                    feedbackMessage.textContent='Par desvinculado.'; updateMatchIndicators(); return;
+                }
+            }
+            let activeSel=(type==='term')?activeTermSelection:activeMatchSelection;
+            if(activeSel)activeSel.classList.remove('selected-term');
+            activeSel=(activeSel===clickedBtn)?null:clickedBtn;
+            if(activeSel)activeSel.classList.add('selected-term');
+            if(type==='term')activeTermSelection=activeSel; else activeMatchSelection=activeSel;
+            if(activeTermSelection&&activeMatchSelection){
+                const tVal=activeTermSelection.dataset.value, mVal=activeMatchSelection.dataset.value;
+                Array.from(userPairs.entries()).forEach(([t,m])=>{if(t===tVal||m===mVal){const oT=Array.from(answerButtons.children).find(b=>b.dataset.type==='term'&&b.dataset.value===t),oM=Array.from(answerButtons.children).find(b=>b.dataset.type==='match'&&b.dataset.value===m);if(oT)oT.classList.remove('paired-item');if(oM)oM.classList.remove('paired-item');userPairs.delete(t)}});
+                userPairs.set(tVal,mVal);
+                activeTermSelection.classList.remove('selected-term','paired-item');activeTermSelection.classList.add('paired-item');
+                activeMatchSelection.classList.remove('selected-term','paired-item');activeMatchSelection.classList.add('paired-item');
+                feedbackMessage.textContent=`Par creado.`;
+                activeTermSelection=null;activeMatchSelection=null;
+                updateMatchIndicators();
+            }
+        }
+
+        function submitMatchAnswer() {
+            stopTimer(); disableAllInteraction(); submitButton.classList.add('hidden');
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const questionPoints = currentQuestion.points;
+            let correctPairs = 0; const totalPairs = currentMatchingMatches.length;
+            const correctMap = new Map(currentMatchingMatches.map(p => [p.term, p.match]));
+            userPairs.forEach((userMatch, userTerm) => {
+                const isCorrect = correctMap.get(userTerm) === userMatch;
+                const termBtn = Array.from(answerButtons.children).find(b => b.dataset.type === 'term' && b.dataset.value === userTerm);
+                const matchBtn = Array.from(answerButtons.children).find(b => b.dataset.type === 'match' && b.dataset.value === userMatch);
+                if (termBtn && matchBtn) {
+                    termBtn.classList.remove('paired-item'); matchBtn.classList.remove('paired-item');
+                    const indicator = matchBtn.querySelector('.match-indicator');
+                    if (isCorrect) {
+                        correctPairs++; termBtn.classList.add('paired-correct'); matchBtn.classList.add('paired-correct');
+                        if (indicator) indicator.classList.add('correct');
+                    } else {
+                        termBtn.classList.add('paired-incorrect'); matchBtn.classList.add('paired-incorrect');
+                        if (indicator) indicator.classList.add('incorrect');
+                    }
+                }
+            });
+            const pointsEarned = totalPairs > 0 ? (correctPairs / totalPairs) * questionPoints : 0;
+            score += pointsEarned;
+            feedbackMessage.textContent = pointsEarned === questionPoints ? '¡Emparejamiento perfecto! ✅' : `Acertaste ${correctPairs} de ${totalPairs}. Ganaste ${pointsEarned.toFixed(2)} puntos.`;
+            
+            const solutionContainer = document.createElement('div');
+            solutionContainer.id = 'solution-container';
+            solutionContainer.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-left';
+            solutionContainer.innerHTML = '<h3 class="font-bold text-lg text-green-800 mb-2">Solución Correcta:</h3>';
+            const solutionList = document.createElement('ul');
+            solutionList.className = 'list-disc list-inside space-y-1 text-green-700';
+            correctMap.forEach((match, term) => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `<span class="font-semibold">${term}</span> &mdash; ${match}`;
+                solutionList.appendChild(listItem);
+            });
+            solutionContainer.appendChild(solutionList);
+            answerButtons.parentNode.appendChild(solutionContainer);
+            showNextButton();
+        }
+
+        function showResult() {
+            stopTimer(); resetState();
+            questionText.classList.add('hidden');
+            feedbackMessage.classList.add('text-2xl', 'font-bold', 'text-[#6F1D45]');
+            feedbackMessage.textContent = `Puntaje final: ${score.toFixed(2)} de ${totalPossibleScore.toFixed(2)}.`;
+            nextButton.innerHTML = "Jugar de Nuevo";
+            nextButton.classList.remove('hidden');
+            progressDisplay.textContent = 'Resultados';
+        }
+
+        function handleNextButton(){
+            feedbackMessage.classList.remove('text-2xl', 'font-bold', 'text-[#6F1D45]');
+            currentQuestionIndex++;
+            if(currentQuestionIndex < shuffledQuizData.length){
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }
+        
+        nextButton.addEventListener('click',()=>{currentQuestionIndex < shuffledQuizData.length ? handleNextButton() : startQuiz()});
+        
+        submitButton.addEventListener('click', () => {
+            const qType = shuffledQuizData[currentQuestionIndex].type;
+            if (qType === 'matching') submitMatchAnswer();
+            else if (qType === 'multiple_select') submitMultipleSelectAnswer();
+        });
+
+        window.onload=startQuiz;
+    </script>
+</body>
+</html>
+
