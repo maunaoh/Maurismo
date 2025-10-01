@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuestionario Interactivo Mejorado</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bloque de CSS Personalizado (Estilos) -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f5f7;
+            color: #374151;
+        }
+        .quiz-container {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .answer-btn, .term-btn {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            word-break: break-word;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem; /* 12px */
+        }
+        
+        /* === Paleta de Colores Principal === */
+        .correct { background-color: #059669 !important; color: white !important; border-color: #047857 !important; }
+        .incorrect { background-color: #e11d48 !important; color: white !important; border-color: #be123c !important; }
+        .selected-term { background-color: #6F1D45 !important; color: white !important; border: 2px solid #581736; transform: scale(1.02); font-weight: 600; }
+        .selected-answer { background-color: #f3e8ee !important; border: 2px solid #6F1D45 !important; }
+        .paired-item { background-color: #f3e8ee; color: #6F1D45; border: 1px dashed #c08497; }
+        .paired-correct { background-color: #a7f3d0 !important; color: #064e3b !important; }
+        .paired-incorrect { background-color: #fecdd3 !important; color: #881337 !important; }
+        .disabled-final { cursor: not-allowed; opacity: 0.8; }
+
+        /* === Estilos del Cronómetro y Puntos === */
+        #timer-container { width: 180px; display: flex; flex-direction: column; align-items: center; }
+        #clock-face { width: 150px; height: 150px; border: 8px solid #e5e7eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; background-color: white; transition: border-color 0.3s; }
+        #clock-face.time-warning { border-color: #f59e0b; }
+        #clock-hand { width: 4px; height: 60px; background-color: #6F1D45; position: absolute; bottom: 50%; left: calc(50% - 2px); transform-origin: bottom center; border-radius: 2px; transition: transform 1s linear; }
+        #timer-text { font-size: 2.5rem; font-weight: 800; color: #6F1D45; z-index: 10; }
+        #points-container { margin-top: 1rem; padding: 0.5rem 1rem; border: 2px solid #f3e8ee; border-radius: 8px; text-align: center; background-color: white; width: 150px; }
+        #points-value { font-size: 1.5rem; font-weight: 700; color: #6F1D45; }
+
+        /* === Estilos para Identificadores de Matching === */
+        .letter-identifier {
+            width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; border-radius: 50%; background-color: #f3e8ee; color: #6F1D45;
+            flex-shrink: 0;
+        }
+        .indicator-placeholder { width: 2rem; height: 2rem; flex-shrink: 0; }
+        .match-indicator {
+            width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; border-radius: 50%; background-color: #6F1D45; color: white;
+            transition: all 0.2s ease-in-out; transform: scale(0);
+        }
+        .match-indicator:not(:empty) { transform: scale(1); }
+        .match-indicator.correct { background-color: #059669 !important; color: white !important; }
+        .match-indicator.incorrect { background-color: #e11d48 !important; color: white !important; }
+        
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; align-items: center; }
+            #timer-container { margin-bottom: 2rem; width: 100%; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="main-layout flex items-start justify-center gap-8 w-full max-w-5xl">
+
+        <!-- Contenedor del Cronómetro y Puntos -->
+        <div id="timer-container">
+            <h3 class="text-xl font-bold text-[#6F1D45] mb-4">Tiempo</h3>
+            <div id="clock-face">
+                <div id="clock-hand"></div>
+                <span id="timer-text">60</span>
+            </div>
+            <div id="points-container">
+                <span class="text-sm font-medium text-gray-500">Valor</span>
+                <p id="points-value">1.00</p>
+            </div>
+        </div>
+
+        <!-- Contenedor principal del Quiz -->
+        <div id="quiz-app" class="quiz-container bg-white p-8 rounded-xl w-full max-w-2xl relative">
+            <h1 id="quiz-title" class="text-2xl font-bold text-center text-[#6F1D45] mb-4 border-b-2 pb-2 border-gray-200">
+                <!-- El título se insertará aquí desde JS -->
+            </h1>
+            <div class="flex justify-center items-center mb-6">
+                <p id="progress-display" class="text-md font-semibold text-gray-600"></p>
+            </div>
+            <div id="question-area">
+                <h2 id="question-text" class="text-xl font-semibold mb-6 text-gray-800 text-center"></h2>
+                <div id="answer-buttons" class="grid grid-cols-1 gap-4 relative"></div>
+            </div>
+            <div class="mt-8 text-center">
+                <p id="feedback-message" class="mt-4 text-lg font-medium h-6"></p>
+                <button id="submit-btn" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out mt-4 mr-4">Enviar Respuesta</button>
+                <button id="next-btn" class="hidden bg-[#6F1D45] hover:bg-[#581736] text-white font-bold py-3 px-6 rounded-full transition duration-300 ease-in-out disabled:opacity-50 mt-4">Siguiente</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloque de JavaScript -->
+    <script>
+        // =========================================================================
+        // 1. DATOS DEL QUIZ
+        // =========================================================================
+        const quizTitle = "Administración de la Producción: Administración y estrategia de las operaciones.";
+        const quizData = [
+            { question: "¿Cuál de las siguientes opciones describe con mayor precisión la función esencial del área de operaciones en una organización?", type: "multiple_choice", points: 1, answers: [{ text: "Transformar insumos en bienes o servicios de forma eficiente", correct: true }, { text: "Establecer estándares de tiempo y mejorar la eficiencia", correct: false }, { text: "Aumentar la presencia de marca", correct: false }, { text: "Automatizar todos los procesos", correct: false }] },
+            { question: "¿Qué elemento es clave en la toma de decisiones operativas?", type: "multiple_choice", points: 1, answers: [{ text: "Diseño organizacional", correct: false }, { text: "Diseño de procesos", correct: true }, { text: "Establecer incentivos salariales", correct: false }, { text: "Política de precios", correct: false }] },
+            { question: "¿Qué característica distingue al sistema productivo enfocado al producto?", type: "multiple_choice", points: 1, answers: [{ text: "Flexibilidad para variedad", correct: false }, { text: "Trabajo personalizado", correct: false }, { text: "Producción intermitente", correct: false }, { text: "Alta estandarización y volumen", correct: true }] },
+            { question: "¿Es el tipo de distribución más adecuada al sistema productivo enfocado al producto?", type: "multiple_choice", points: 1, answers: [{ text: "Por posición fija", correct: false }, { text: "En línea", correct: true }, { text: "Manufactura celular", correct: false }, { text: "Funcional", correct: false }] },
+            { question: "Es una ventaja de los sistemas enfocados al proceso", type: "multiple_choice", points: 1, answers: [{ text: "Menor necesidad de supervisión", correct: false }, { text: "Mayor automatización", correct: false }, { text: "Flexibilidad para múltiples productos", correct: true }, { text: "Alta estandarización", correct: false }] },
+            { question: "¿Qué industria suele usar el sistema de manufactura enfocado al proceso?", type: "multiple_choice", points: 1, answers: [{ text: "Construcción naval", correct: false }, { text: "Automotriz", correct: false }, { text: "Servicios mercantiles", correct: false }, { text: "Servicios hospitalarios", correct: true }] },
+            { question: "¿Qué principio define la organización de los recursos en un sistema de manufactura celular?", type: "multiple_choice", points: 1, answers: [{ text: "Separar las operaciones por funciones tradicionales", correct: false }, { text: "Distribuir los equipos de forma aleatoria para mayor flexibilidad", correct: false }, { text: "Agrupar máquinas y operadores para fabricar eficientemente familias de productos similares", correct: true }, { text: "Centralizar todos los procesos en una única línea continua", correct: false }] },
+            { question: "¿Qué técnica permite identificar grupos de componentes similares para formar células de manufactura eficientes?", type: "multiple_choice", points: 1, answers: [{ text: "Análisis ABC de inventario", correct: false }, { text: "Clasificación y codificación grupal de productos (Group Technology)", correct: true }, { text: "Evaluación de capacidades individuales", correct: false }, { text: "Manufactura enfocada al producto", correct: false }] },
+            { question: "Es una dificultad operativa de la distribución por posición fija", type: "multiple_choice", points: 1, answers: [{ text: "Coordinación compleja de recursos móviles", correct: true }, { text: "Control y ajuste de la producción", correct: false }, { text: "Definir capacidad instalada", correct: false }, { text: "Medir calidad del producto", correct: false }] },
+            { question: "¿Qué modelo estratégico analiza la relación empresa–entorno interno y externo?", type: "multiple_choice", points: 1, answers: [{ text: "Análisis PESTEL", correct: false }, { text: "Balance SCORE CARD", correct: false }, { text: "Análisis FODA", correct: true }, { text: "Análisis VRIO", correct: false }] },
+            { question: "Permite identificar la diferencia entre el estado actual de una organización y el estado deseado, para cerrar esa distancia mediante acciones concretas", type: "multiple_choice", points: 1, answers: [{ text: "Gap Analysis", correct: true }, { text: "Análisis FODA", correct: false }, { text: "Análisis VRIO", correct: false }, { text: "Estrategia de océano azul", correct: false }] },
+            { question: "¿Cuál es la finalidad principal de una cadena de suministro dentro de una organización productiva o de servicios?", type: "multiple_choice", points: 1, answers: [{ text: "Asegurar el flujo continuo de bienes, información y capital", correct: true }, { text: "Incrementar el volumen de producción sin importar la demanda", correct: false }, { text: "Reducir los tiempos de capacitación del retailer", correct: false }, { text: "Subcontratar todos los procesos operativos para reducir costos", correct: false }] },
+            { question: "¿Qué característica esencial distingue a una cadena de suministro eficaz en términos de coordinación y competitividad?", type: "multiple_choice", points: 1, answers: [{ text: "Integración colaborativa entre las partes interesadas en la cadena (proveedor-cliente)", correct: true }, { text: "Fuerte segmentación de cada proceso operativo", correct: false }, { text: "Alta rotación de proveedores y productos", correct: false }, { text: "Producción enfocada exclusivamente en costos mínimos", correct: false }] },
+            { question: "¿Qué aspecto analiza el modelo de las cinco fuerzas de Porter dentro de la planeación estratégica empresarial?", type: "multiple_choice", points: 1, answers: [{ text: "El nivel de integración de la cadena logística", correct: false }, { text: "Las presiones competitivas del entorno que afectan la rentabilidad del negocio", correct: true }, { text: "Las capacidades internas de producción", correct: false }, { text: "Las métricas financieras para evaluar el valor de mercado", correct: false }] },
+            { question: "Es un inconveniente del sistema enfocado al proceso", type: "multiple_choice", points: 1, answers: [{ text: "Bajo control de calidad debido a operaciones repetitivas", correct: false }, { text: "Alta estandarización sin necesidad de especialización", correct: false }, { text: "Elevada complejidad para coordinar el flujo de materiales entre áreas funcionales", correct: true }, { text: "Poca variedad de productos y baja capacidad de adaptación", correct: false }] },
+            { question: "¿Cuál de los siguientes autores define la Administración como \"el proceso de planear, organizar, liderar y controlar el trabajo de los integrantes de una organización\"?", type: "multiple_choice", points: 1, answers: [{ text: "Idalberto Chiavenato", correct: false }, { text: "Harold Koontz y Heinz Weihrich", correct: false }, { text: "James Stoner y Edward Freeman", correct: true }, { text: "Muñoz", correct: false }] },
+            { question: "La administración de operaciones se encarga únicamente de la producción de bienes, excluyendo la generación de servicios.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false }, { text: "Falso", correct: true }] },
+            { question: "Relaciona cada tipo de distribución con su característica principal:", type: "matching", points: 4, matches: [{ term: "Distribución enfocada al producto", match: "Secuencia lineal y estandarizada" }, { term: "Distribución enfocada al proceso", match: "Agrupación por funciones o procesos similares" }, { term: "Distribución por posición fija", match: "Recursos móviles hacia el producto fijo" }, { term: "Manufactura celular", match: "Agrupación por familias de productos similares" }] },
+            { question: "¿Cuál de estos es un desafío actual de la administración de operaciones mencionado en el documento?", type: "multiple_choice", points: 1, answers: [{ text: "Reducción de la competencia global", correct: false }, { text: "Ciclo de vida de la innovación", correct: true }, { text: "Eliminación de la responsabilidad social", correct: false }, { text: "Menor enfoque en la calidad", correct: false }] },
+            { question: "Las 5 P’s de la dirección de operaciones son: Personal, Procesos, Administración de la producción, Planta y __________.", type: "multiple_choice", points: 1, answers: [{ text: "Planeación", correct: true }, { text: "Producto", correct: false }, { text: "Precio", correct: false }, { text: "Productividad", correct: false }] },
+            { question: "El estudio de tiempos y movimientos fue una contribución de Frederick W. Taylor en el año 1900.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "¿Qué herramienta de planeación estratégica se enfoca en crear nuevos mercados no explorados?", type: "multiple_choice", points: 1, answers: [{ text: "Análisis FODA", correct: false }, { text: "Estrategia de océano azul", correct: true }, { text: "5 Fuerzas de Porter", correct: false }, { text: "Análisis PESTEL", correct: false }] },
+            { question: "Relaciona el concepto VUCA con su definición:", type: "matching", points: 4, matches: [{ term: "Volatilidad", match: "Naturaleza y dinámica de los cambios, y su velocidad" }, { term: "Incertidumbre", match: "Falta de previsibilidad y aumento de situaciones imprevistas" }, { term: "Complejidad", match: "Desconcierto por la multitud de factores interrelacionados" }, { term: "Ambigüedad", match: "Falta de claridad que da pie a interpretaciones diversas" }] },
+            { question: "¿Qué elemento NO forma parte de las entradas de un sistema de producción según el documento?", type: "multiple_choice", points: 1, answers: [{ text: "Materias primas", correct: false }, { text: "Información", correct: false }, { text: "Producto terminado", correct: true }, { text: "Recursos humanos", correct: false }] },
+            { question: "La manufactura celular combina características de la distribución por producto y por proceso.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "La administración de operaciones es la disciplina que estudia la planeación, organización, dirección y __________ de las operaciones productivas.", type: "multiple_choice", points: 1, answers: [{ text: "control", correct: true }, { text: "mejora", correct: false }, { text: "innovación", correct: false }, { text: "supervisión", correct: false }] },
+            { question: "¿Cuál de los siguientes es un reto empresarial actual en la cadena de suministro según el documento?", type: "multiple_choice", points: 1, answers: [{ text: "Disminución de la competencia", correct: false }, { text: "Contratar trabajadores calificados", correct: true }, { text: "Reducción de la incertidumbre en los pronósticos", correct: false }, { text: "Menor enfoque en la calidad", correct: false }] },
+            { question: "La logística se encarga solo del transporte de productos terminados, sin incluir el flujo de información.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false }, { text: "Falso", correct: true }] },
+            { question: "¿Qué tipo de sistema de producción es común en industrias como la aeronáutica o la construcción?", type: "multiple_choice", points: 1, answers: [{ text: "Distribución en línea", correct: false }, { text: "Distribución por proceso", correct: false }, { text: "Distribución por posición fija", correct: true }, { text: "Manufactura celular", correct: false }] },
+            { question: "El Cuadro de Mando Integral también es conocido como __________ en el contexto de la planeación estratégica.", type: "multiple_choice", points: 1, answers: [{ text: "Balanced Scorecard o Hoshin Kanri", correct: true }, { text: "Análisis FODA", correct: false }, { text: "Diagrama de Gantt", correct: false }, { text: "Análisis PESTEL", correct: false }] },
+            { question: "Los sistemas de producción son un conjunto de procesos que transforman insumos que generan valor.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "Una operación bien administrada puede generar ventajas competitivas sostenibles para la organización.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "La revolución industrial se caracterizó por generar grandes centros industriales con producción a gran escala.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "Las líneas de ensamblaje automatizadas son ejemplos típicos de sistemas enfocados al producto.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "La totalidad y complejidad son principios de la visión sistémica de los sistemas productivos.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "La administración industrial se caracteriza por el empleo de la inferencia estadística para el estudio de la producción.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "La programación y el control de flujo en sistemas por proceso es simple y estandarizada.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: false }, { text: "Falso", correct: true }] },
+            { question: "La distribución por posición fija es común en industrias como la aeronáutica, construcción o fabricación de turbinas.", type: "true_false", points: 1, answers: [{ text: "Verdadero", correct: true }, { text: "Falso", correct: false }] },
+            { question: "¿Cuál de los siguientes NO se menciona explícitamente como un desafío de la administración de operaciones?", type: "multiple_choice", points: 1, answers: [{ text: "Enfoque Global", correct: false }, { text: "Productos a la medida", correct: false }, { text: "Reducción de la plantilla laboral", correct: true }, { text: "Responsabilidad social, empresarial y ambiental", correct: false }] },
+            { question: "De acuerdo con las \"Estrategias de operaciones orientadas a la ventaja competitiva\", ¿cuál es uno de los propósitos clave de la tecnología y mecanización?", type: "multiple_choice", points: 1, answers: [{ text: "Aumentar la dependencia del trabajo manual", correct: false }, { text: "Reducir los costos de operación y mano de obra", correct: true }, { text: "Eliminar la necesidad de cadena de suministro", correct: false }, { text: "Disminuir los estándares de calidad", correct: false }] },
+            { question: "Según los \"Retos actuales que enfrentan las cadenas de suministros\", ¿cuál de estos es un desafío mencionado?", type: "multiple_choice", points: 1, answers: [{ text: "Disminución de la conciencia ambiental", correct: false }, { text: "Cadenas más pequeñas y simples", correct: false }, { text: "Abastecimiento y distribución global", correct: true }, { text: "Menor introducción de nuevos productos", correct: false }] },
+            { question: "La \"Administración de operaciones a nivel global\" implica visualizar en términos globales a:", type: "multiple_choice", points: 1, answers: [{ text: "Solo los clientes directos", correct: false }, { text: "Únicamente a los competidores locales", correct: false }, { text: "Clientes, proveedores y competidores", correct: true }, { text: "Exclusivamente la cadena de suministro nacional", correct: false }] },
+            { question: "¿Cuál de las siguientes opciones representa un reto actual de las cadenas de suministro?", type: "multiple_choice", points: 1, answers: [{ text: "Cadenas muy \"magras\" vulnerables a crisis", correct: true }, { text: "Reducción de la competencia global", correct: false }, { text: "Menor enfoque en el valor agregado", correct: false }, { text: "Desaparición de acuerdos multinacionales", correct: false }] },
+            { question: "Haz el match adecuado de la tierlist de proveedores.", type: "matching", points: 4, matches: [{ term: "T1", match: "Integradores de componentes" }, { term: "T2", match: "Subsistemas" }, { term: "T3", match: "Elementos" }, { term: "T4", match: "Materias primas" }] },
+            { question: "¿Qué sistema económico y social se caracterizó por la producción basada en la agricultura y los señores feudales?", type: "multiple_choice", points: 1, answers: [{ text: "Feudalismo", correct: true }, { text: "Taylorismo", correct: false }, { text: "Fordismo", correct: false }, { text: "Toyotismo", correct: false }] },
+            { question: "¿Quién es conocido como el padre de la administración científica y promovió el estudio de tiempos y movimientos?", type: "multiple_choice", points: 1, answers: [{ text: "Adam Smith", correct: false }, { text: "Henry Ford", correct: false }, { text: "Frederick Taylor", correct: true }, { text: "Taiichi Ohno", correct: false }] },
+            { question: "¿Qué modelo de producción introdujo la línea de ensamblaje para fabricar automóviles a gran escala?", type: "multiple_choice", points: 1, answers: [{ text: "Toyotismo", correct: false }, { text: "Fordismo", correct: true }, { text: "Taylorismo", correct: false }, { text: "Feudalismo", correct: false }] },
+            { question: "¿Qué sistema de producción, originado en Japón, se enfoca en la eliminación de desperdicios y la producción \"justo a tiempo\"?", type: "multiple_choice", points: 1, answers: [{ text: "Fordismo", correct: false }, { text: "Taylorismo", correct: false }, { text: "Toyotismo", correct: true }, { text: "Feudalismo", correct: false }] },
+            { question: "¿En qué siglo comenzó la Revolución Industrial, marcando el paso de la producción artesanal a la industrial?", type: "multiple_choice", points: 1, answers: [{ text: "Siglo XVII", correct: false }, { text: "Siglo XVIII", correct: true }, { text: "Siglo XIX", correct: false }, { text: "Siglo XX", correct: false }] },
+            { question: "¿Quién escribió \"La Riqueza de las Naciones\" y promovió la especialización del trabajo?", type: "multiple_choice", points: 1, answers: [{ text: "Frederick Taylor", correct: false }, { text: "Adam Smith", correct: true }, { text: "Henry Ford", correct: false }, { text: "Eli Whitney", correct: false }] },
+            { question: "¿Qué sigla representa el sistema de producción que busca la \"calidad total\" en todos los procesos?", type: "multiple_choice", points: 1, answers: [{ text: "JIT", correct: false }, { text: "TPM", correct: false }, { text: "TQM", correct: true }, { text: "TPS", correct: false }] },
+            { question: "¿Qué metodología se enfoca en reducir variaciones y defectos mediante el análisis estadístico?", type: "multiple_choice", points: 1, answers: [{ text: "Lean Production", correct: false }, { text: "Six Sigma", correct: true }, { text: "TOC", correct: false }, { text: "Benchmarking", correct: false }] },
+            { question: "¿Cuál es el principal objetivo de la Reingeniería de procesos según los conceptos modernos de administración de operaciones?", type: "multiple_choice", points: 1, answers: [{ text: "Realizar mejoras incrementales en los procesos existentes", correct: false }, { text: "Rediseñar radicalmente los procesos para lograr mejoras dramáticas en rendimiento", correct: true }, { text: "Mantener los procesos tradicionales, pero con mejor tecnología", correct: false }, { text: "Enfocarse únicamente en la reducción de costos operativos", correct: false }] },
+            { question: "La filosofía de Lean Production se caracteriza principalmente por:", type: "multiple_choice", points: 1, answers: [{ text: "Producir grandes lotes para maximizar el uso de maquinaria", correct: false }, { text: "Mantener altos inventarios para evitar faltantes", correct: false }, { text: "Eliminar todo tipo de desperdicios en el sistema productivo", correct: true }, { text: "Utilizar tecnología de punta sin modificar los procesos", correct: false }] },
+            { question: "¿Cuál es el propósito principal del sistema KANBAN en un entorno de producción?", type: "multiple_choice", points: 1, answers: [{ text: "Aumentar los niveles de inventario para garantizar la disponibilidad", correct: false }, { text: "Establecer un sistema de push para impulsar la producción", correct: false }, { text: "Visualizar el trabajo y limitar el trabajo en proceso mediante un sistema pull", correct: true }, { text: "Reemplazar toda la mano de obra por sistemas automatizados", correct: false }] }
+        ];
+
+        // =========================================================================
+        // 2. LÓGICA DEL QUIZ Y ESTADO
+        // =========================================================================
+        const quizTitleEl = document.getElementById('quiz-title'), questionText = document.getElementById('question-text'), answerButtons = document.getElementById('answer-buttons'), nextButton = document.getElementById('next-btn'), submitButton = document.getElementById('submit-btn'), feedbackMessage = document.getElementById('feedback-message'), progressDisplay = document.getElementById('progress-display'), clockFace = document.getElementById('clock-face'), clockHand = document.getElementById('clock-hand'), timerText = document.getElementById('timer-text'), pointsValue = document.getElementById('points-value');
+        
+        let currentQuestionIndex = 0, score = 0, totalPossibleScore = 0, shuffledQuizData = [], timer = null, timeLeft = 60, TIME_PER_QUESTION = 60;
+        let activeTermSelection = null, activeMatchSelection = null, userPairs = new Map(), currentMatchingMatches = []; 
+
+        function shuffleArray(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}}
+
+        function startTimer() {
+            clearInterval(timer); timeLeft = TIME_PER_QUESTION; clockFace.classList.remove('time-warning');
+            clockHand.style.transition = 'none'; clockHand.style.transform = 'rotate(0deg)';
+            void clockHand.offsetWidth; clockHand.style.transition = `transform 1s linear`;
+            timerText.textContent = timeLeft;
+            timer = setInterval(() => {
+                timeLeft--; timerText.textContent = timeLeft;
+                const degrees = ((TIME_PER_QUESTION - timeLeft) / TIME_PER_QUESTION) * 360;
+                clockHand.style.transform = `rotate(${degrees}deg)`;
+                if (timeLeft <= 10 && timeLeft > 0) clockFace.classList.add('time-warning');
+                else if (timeLeft <= 0) timesUp();
+            }, 1000);
+        }
+
+        function stopTimer(){clearInterval(timer)}
+        
+        function timesUp() {
+            stopTimer(); feedbackMessage.textContent = '¡Tiempo agotado! ⌛';
+            const qType = shuffledQuizData[currentQuestionIndex].type;
+            if (qType === 'matching') submitMatchAnswer();
+            else if (qType === 'multiple_select') submitMultipleSelectAnswer();
+            else {
+                disableAllInteraction();
+                Array.from(answerButtons.children).forEach(b => { if (b.dataset.correct === 'true') b.classList.add('correct'); });
+                showNextButton(2000);
+            }
+        }
+        
+        function showNextButton(d=0){setTimeout(()=>{nextButton.classList.remove('hidden');nextButton.disabled=false;submitButton.classList.add('hidden')},d)}
+
+        function startQuiz() {
+            quizTitleEl.textContent = quizTitle;
+            shuffledQuizData = [...quizData];
+            shuffleArray(shuffledQuizData);
+            currentQuestionIndex = 0; score = 0;
+            totalPossibleScore = shuffledQuizData.reduce((sum, question) => sum + question.points, 0);
+            nextButton.innerHTML = "Siguiente"; nextButton.classList.add('hidden');
+            submitButton.classList.add('hidden'); feedbackMessage.textContent = '';
+            questionText.classList.remove('hidden');
+            showQuestion();
+        }
+
+        function resetState() {
+            nextButton.classList.add('hidden'); submitButton.classList.add('hidden');
+            feedbackMessage.textContent = '';
+            answerButtons.className = 'grid grid-cols-1 gap-4 relative'; 
+            const solutionContainer = document.getElementById('solution-container');
+            if (solutionContainer) solutionContainer.remove();
+            while (answerButtons.firstChild) answerButtons.removeChild(answerButtons.firstChild);
+            activeTermSelection = null; activeMatchSelection = null; userPairs.clear(); currentMatchingMatches = [];
+        }
+
+        function showQuestion() {
+            stopTimer(); resetState();
+            const q = shuffledQuizData[currentQuestionIndex];
+            progressDisplay.textContent = `Pregunta ${currentQuestionIndex + 1} de ${shuffledQuizData.length}`;
+            questionText.textContent = q.question;
+            pointsValue.textContent = `${q.points.toFixed(2)}`;
+            
+            if (q.type === 'matching') {
+                showMatching(q); submitButton.textContent = 'Enviar Pares';
+                submitButton.classList.remove('hidden'); submitButton.disabled = false;
+            } else if (q.type === 'multiple_select') {
+                if (q.answers.length > 6) answerButtons.className = 'grid grid-cols-2 gap-x-6 gap-y-4 relative';
+                showMultipleSelect(q); submitButton.textContent = 'Enviar Selección';
+                submitButton.classList.remove('hidden'); submitButton.disabled = false;
+            } else {
+                showMultipleChoice(q);
+            }
+            startTimer();
+        }
+
+        function disableAllInteraction(){Array.from(answerButtons.children).forEach(b=>{b.disabled=true;b.classList.add('disabled-final');});submitButton.disabled=true}
+
+        function showMultipleChoice(q) {
+            q.answers.forEach(a => {
+                const b = document.createElement('button'); b.textContent = a.text;
+                b.classList.add('answer-btn','bg-gray-200','text-gray-800','font-medium','py-3','px-4','rounded-lg','text-left','hover:bg-gray-300','focus:outline-none','focus:ring-2','focus:ring-[#6F1D45]');
+                if (a.correct) b.dataset.correct = a.correct;
+                b.addEventListener('click', selectAnswer); answerButtons.appendChild(b);
+            });
+        }
+        
+        function selectAnswer(e) {
+            stopTimer();
+            const sb = e.currentTarget;
+            const isC = sb.dataset.correct === 'true';
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const points = currentQuestion.points;
+
+            if (isC) {
+                sb.classList.add('correct');
+                feedbackMessage.textContent = `¡Correcto! ✅ (+${points.toFixed(2)} Puntos)`;
+                score += points;
+            } else {
+                sb.classList.add('incorrect');
+                feedbackMessage.textContent = 'Incorrecto. ❌';
+            }
+            disableAllInteraction();
+            Array.from(answerButtons.children).forEach(b => { if (b.dataset.correct === 'true') b.classList.add('correct'); });
+            showNextButton();
+        }
+
+        function showMultipleSelect(q) {
+            q.answers.forEach(a => {
+                const button = document.createElement('button');
+                button.innerHTML = `<div class="w-6 h-6 border-2 border-gray-400 rounded-md flex items-center justify-center flex-shrink-0 transition-colors"><svg class="w-4 h-4 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg></div><span class="flex-grow text-left">${a.text}</span>`;
+                button.classList.add('answer-btn', 'bg-gray-200', 'text-gray-800', 'font-medium', 'py-3', 'px-4', 'rounded-lg', 'hover:bg-gray-300', 'focus:outline-none', 'focus:ring-2', 'focus:ring-[#6F1D45]');
+                button.dataset.correct = a.correct;
+                button.dataset.selected = 'false';
+                button.addEventListener('click', toggleAnswerSelection);
+                answerButtons.appendChild(button);
+            });
+        }
+
+        function toggleAnswerSelection(e) {
+            const button = e.currentTarget;
+            const isSelected = button.dataset.selected === 'true';
+            button.dataset.selected = String(!isSelected);
+            button.classList.toggle('selected-answer');
+            const checkbox = button.querySelector('div');
+            const checkmark = button.querySelector('svg');
+            checkbox.classList.toggle('bg-[#6F1D45]'); checkbox.classList.toggle('border-[#6F1D45]');
+            checkmark.classList.toggle('hidden');
+        }
+
+        function submitMultipleSelectAnswer() {
+            stopTimer(); disableAllInteraction(); submitButton.classList.add('hidden');
+            const buttons = Array.from(answerButtons.children);
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const totalCorrectOptions = currentQuestion.answers.filter(a => a.correct).length;
+            let correctSelections = 0, incorrectSelections = 0;
+
+            buttons.forEach(button => {
+                const isCorrect = button.dataset.correct === 'true', isSelected = button.dataset.selected === 'true';
+                if (isSelected && isCorrect) correctSelections++;
+                else if (isSelected && !isCorrect) incorrectSelections++;
+                if (isCorrect) button.classList.add('correct');
+                if (isSelected && !isCorrect) button.classList.add('incorrect');
+            });
+
+            const questionPoints = currentQuestion.points;
+            const pointsEarned = questionPoints * (Math.max(0, correctSelections - incorrectSelections) / totalCorrectOptions);
+            score += pointsEarned > 0 ? pointsEarned : 0;
+            feedbackMessage.textContent = `¡Respuesta evaluada! Ganaste ${pointsEarned > 0 ? pointsEarned.toFixed(2) : '0.00'} puntos.`;
+            showNextButton();
+        }
+        
+        function createMatchingButton(text, type, letter = '') {
+            const button = document.createElement('button');
+            button.classList.add('term-btn', 'bg-gray-200', 'text-gray-800', 'font-medium', 'p-3', 'rounded-lg', 'text-left', 'h-full', 'z-10');
+            button.dataset.value = text; button.dataset.type = type;
+            if (type === 'term') {
+                button.dataset.letter = letter;
+                button.innerHTML = `<div class="letter-identifier">${letter}</div><span class="flex-grow">${text}</span>`;
+            } else {
+                button.innerHTML = `<div class="indicator-placeholder"><div class="match-indicator"></div></div><span class="flex-grow">${text}</span>`;
+            }
+            button.addEventListener('click', handleMatchingSelection);
+            return button;
+        }
+
+        function showMatching(q) {
+            answerButtons.className = 'grid grid-cols-2 gap-x-8 gap-y-4 relative'; 
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+            let terms = q.matches.map(m => m.term), matches = q.matches.map(m => m.match);
+            currentMatchingMatches = q.matches; shuffleArray(matches); 
+            for (let i = 0; i < terms.length; i++) {
+                answerButtons.appendChild(createMatchingButton(terms[i], 'term', alphabet[i]));
+                answerButtons.appendChild(createMatchingButton(matches[i], 'match'));
+            }
+        }
+        
+        function updateMatchIndicators() {
+            const matchToTerm = new Map([...userPairs].map(([term, match]) => [match, term]));
+            const termToLetter = new Map();
+            Array.from(answerButtons.children).filter(btn => btn.dataset.type === 'term').forEach(btn => termToLetter.set(btn.dataset.value, btn.dataset.letter));
+            Array.from(answerButtons.children).filter(btn => btn.dataset.type === 'match').forEach(matchBtn => {
+                const indicator = matchBtn.querySelector('.match-indicator');
+                const matchValue = matchBtn.dataset.value;
+                if (matchToTerm.has(matchValue)) {
+                    const termValue = matchToTerm.get(matchValue);
+                    indicator.textContent = termToLetter.get(termValue);
+                } else {
+                    indicator.textContent = '';
+                }
+            });
+        }
+
+        function handleMatchingSelection(e) {
+            const clickedBtn = e.currentTarget; const type = clickedBtn.dataset.type;
+            if (clickedBtn.classList.contains('paired-item')) {
+                const pVal=(type==='term')?userPairs.get(clickedBtn.dataset.value):Array.from(userPairs.entries()).find(([,m])=>m===clickedBtn.dataset.value)?.[0];
+                if(pVal){
+                    const pEl=Array.from(answerButtons.children).find(b=>b.dataset.value===pVal&&b!==clickedBtn);
+                    clickedBtn.classList.remove('paired-item'); if(pEl)pEl.classList.remove('paired-item');
+                    if(type==='term')userPairs.delete(clickedBtn.dataset.value); else Array.from(userPairs.entries()).forEach(([t,m])=>{if(m===clickedBtn.dataset.value)userPairs.delete(t)});
+                    feedbackMessage.textContent='Par desvinculado.'; updateMatchIndicators(); return;
+                }
+            }
+            let activeSel=(type==='term')?activeTermSelection:activeMatchSelection;
+            if(activeSel)activeSel.classList.remove('selected-term');
+            activeSel=(activeSel===clickedBtn)?null:clickedBtn;
+            if(activeSel)activeSel.classList.add('selected-term');
+            if(type==='term')activeTermSelection=activeSel; else activeMatchSelection=activeSel;
+            if(activeTermSelection&&activeMatchSelection){
+                const tVal=activeTermSelection.dataset.value, mVal=activeMatchSelection.dataset.value;
+                Array.from(userPairs.entries()).forEach(([t,m])=>{if(t===tVal||m===mVal){const oT=Array.from(answerButtons.children).find(b=>b.dataset.type==='term'&&b.dataset.value===t),oM=Array.from(answerButtons.children).find(b=>b.dataset.type==='match'&&b.dataset.value===m);if(oT)oT.classList.remove('paired-item');if(oM)oM.classList.remove('paired-item');userPairs.delete(t)}});
+                userPairs.set(tVal,mVal);
+                activeTermSelection.classList.remove('selected-term','paired-item');activeTermSelection.classList.add('paired-item');
+                activeMatchSelection.classList.remove('selected-term','paired-item');activeMatchSelection.classList.add('paired-item');
+                feedbackMessage.textContent=`Par creado.`;
+                activeTermSelection=null;activeMatchSelection=null;
+                updateMatchIndicators();
+            }
+        }
+
+        function submitMatchAnswer() {
+            stopTimer(); disableAllInteraction(); submitButton.classList.add('hidden');
+            const currentQuestion = shuffledQuizData[currentQuestionIndex];
+            const questionPoints = currentQuestion.points;
+            let correctPairs = 0; const totalPairs = currentMatchingMatches.length;
+            const correctMap = new Map(currentMatchingMatches.map(p => [p.term, p.match]));
+            userPairs.forEach((userMatch, userTerm) => {
+                const isCorrect = correctMap.get(userTerm) === userMatch;
+                const termBtn = Array.from(answerButtons.children).find(b => b.dataset.type === 'term' && b.dataset.value === userTerm);
+                const matchBtn = Array.from(answerButtons.children).find(b => b.dataset.type === 'match' && b.dataset.value === userMatch);
+                if (termBtn && matchBtn) {
+                    termBtn.classList.remove('paired-item'); matchBtn.classList.remove('paired-item');
+                    const indicator = matchBtn.querySelector('.match-indicator');
+                    if (isCorrect) {
+                        correctPairs++; termBtn.classList.add('paired-correct'); matchBtn.classList.add('paired-correct');
+                        if (indicator) indicator.classList.add('correct');
+                    } else {
+                        termBtn.classList.add('paired-incorrect'); matchBtn.classList.add('paired-incorrect');
+                        if (indicator) indicator.classList.add('incorrect');
+                    }
+                }
+            });
+            const pointsEarned = totalPairs > 0 ? (correctPairs / totalPairs) * questionPoints : 0;
+            score += pointsEarned;
+            feedbackMessage.textContent = pointsEarned === questionPoints ? '¡Emparejamiento perfecto! ✅' : `Acertaste ${correctPairs} de ${totalPairs}. Ganaste ${pointsEarned.toFixed(2)} puntos.`;
+            showNextButton();
+        }
+
+        function showResult() {
+            stopTimer(); resetState();
+            questionText.classList.add('hidden');
+            feedbackMessage.classList.add('text-2xl', 'font-bold', 'text-[#6F1D45]');
+            feedbackMessage.textContent = `Puntaje final: ${score.toFixed(2)} de ${totalPossibleScore.toFixed(2)}.`;
+            nextButton.innerHTML = "Jugar de Nuevo";
+            nextButton.classList.remove('hidden');
+            progressDisplay.textContent = 'Resultados';
+        }
+
+        function handleNextButton(){
+            feedbackMessage.classList.remove('text-2xl', 'font-bold', 'text-[#6F1D45]');
+            currentQuestionIndex++;
+            if(currentQuestionIndex < shuffledQuizData.length){
+                showQuestion();
+            } else {
+                showResult();
+            }
+        }
+        
+        nextButton.addEventListener('click',()=>{currentQuestionIndex < shuffledQuizData.length ? handleNextButton() : startQuiz()});
+        
+        submitButton.addEventListener('click', () => {
+            const qType = shuffledQuizData[currentQuestionIndex].type;
+            if (qType === 'matching') submitMatchAnswer();
+            else if (qType === 'multiple_select') submitMultipleSelectAnswer();
+        });
+
+        window.onload=startQuiz;
+    </script>
+</body>
+</html>
